@@ -7,6 +7,15 @@ version '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
+
+    maven {
+        name = "GitHubPackages"
+        url = "https://maven.pkg.github.com/euphonious28/tson-lsp4j-lsp"
+        credentials {
+            username = System.getenv("GITHUB_ACTOR")
+            password = System.getenv("GITHUB_TOKEN")
+        }
+    }
 }
 
 dependencies {
