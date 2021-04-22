@@ -1,4 +1,4 @@
-rootProject.name = 'TSON LSP'
+rootProject.name = 'tson'
 include 'tson-lsp'
 include 'tson-parser'
 
