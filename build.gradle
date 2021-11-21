@@ -10,11 +10,18 @@ def mainClassName = 'com.tson.lsp.TSONLauncher'
 
 repositories {
     mavenCentral()
+    maven {
+        url = uri("https://maven.pkg.github.com/euphonious28/tson")
+        credentials {
+            username = project.findProperty("gitHubUsername") ?: System.getenv("GITHUB_ACTOR")
+            password = project.findProperty("gitHubToken") ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
 }
 
 dependencies {
     implementation 'org.eclipse.lsp4j:org.eclipse.lsp4j:0.12.0'
-    implementation project (":tson")
+    implementation 'com.euph28:tson:0.1.0-cleaner-lsp.53'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
 }
