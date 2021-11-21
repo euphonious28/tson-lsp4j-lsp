@@ -1,6 +1,6 @@
 package com.tson.lsp;
 
-import com.euph28.tson.interpreter.keyword.Keyword;
+import com.euph28.tson.core.keyword.Keyword;
 import com.tson.lsp.data.TSONData;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -37,13 +37,13 @@ public class TSONTestTextDocumentService implements TextDocumentService {
             List<CompletionItem> completionItemList = new ArrayList<>();
 
             String keywordList = "";
-            for(Keyword keyword : data.getKeywordList()) {
+            for (Keyword keyword : data.getKeywordList()) {
                 CompletionItem completionItem = new CompletionItem();
                 completionItem.setInsertText(keyword.getCode());
                 completionItem.setLabel(keyword.getCode());
-                completionItem.setFilterText(keyword.getCode() + " " + keyword.getDescriptionShort());
-                completionItem.setDetail(keyword.getDescriptionShort());
-                completionItem.setDocumentation(keyword.getDescriptionLong());
+                completionItem.setFilterText(keyword.getCode() + " " + String.join(" ", keyword.getLspTags()));
+                completionItem.setDetail(keyword.getLspDescriptionShort());
+                completionItem.setDocumentation(keyword.getLspDescriptionLong());
                 completionItem.setKind(CompletionItemKind.Function);
                 completionItemList.add(completionItem);
                 keywordList = keywordList + "|" + keyword.getCode();

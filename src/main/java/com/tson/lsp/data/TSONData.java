@@ -2,9 +2,9 @@ package com.tson.lsp.data;
 
 import com.euph28.tson.assertionengine.TSONAssertionEngine;
 import com.euph28.tson.context.TSONContext;
+import com.euph28.tson.core.keyword.Keyword;
 import com.euph28.tson.filereader.FileReader;
 import com.euph28.tson.interpreter.TSONInterpreter;
-import com.euph28.tson.interpreter.keyword.Keyword;
 import com.euph28.tson.restclientinterface.TSONRestClient;
 
 import java.util.ArrayList;
