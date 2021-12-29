@@ -1,12 +1,9 @@
 package com.tson.lsp.data;
 
-import com.euph28.tson.assertionengine.TSONAssertionEngine;
-import com.euph28.tson.context.TSONContext;
 import com.euph28.tson.core.keyword.Keyword;
-import com.euph28.tson.filereader.FileReader;
-import com.euph28.tson.interpreter.TSONInterpreter;
-import com.euph28.tson.restclientinterface.TSONRestClient;
+import com.euph28.tson.runner.TSONRunner;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,13 +12,8 @@ public class TSONData {
     List<Keyword> keywordList = new ArrayList<>();
 
     public TSONData() {
-        TSONInterpreter tsonInterpreter = new TSONInterpreter();
-        TSONAssertionEngine tsonAssertionEngine = new TSONAssertionEngine();
-        TSONRestClient tsonRestClient = new TSONRestClient(new FileReader("/"));
-        TSONContext tsonContext = new TSONContext(tsonInterpreter, tsonRestClient);
-        keywordList.addAll(tsonAssertionEngine.getKeywordList());
-        keywordList.addAll(tsonRestClient.getKeywordList());
-        keywordList.addAll(tsonContext.getKeywordList());
+        TSONRunner tsonRunner = new TSONRunner(Paths.get("").toAbsolutePath().toFile());
+        keywordList.addAll(tsonRunner.getTsonInterpreter().getKeywords());
     }
 
     public List<Keyword> getKeywordList() {

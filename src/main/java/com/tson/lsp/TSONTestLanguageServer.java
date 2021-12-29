@@ -3,6 +3,8 @@ package com.tson.lsp;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.services.*;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public class TSONTestLanguageServer implements LanguageServer, LanguageClientAware {
@@ -33,10 +35,27 @@ public class TSONTestLanguageServer implements LanguageServer, LanguageClientAwa
         // Result item to return. Contains the server's capabilities
         InitializeResult initializeResult = new InitializeResult(new ServerCapabilities());
 
-        // Update the server capabilities
+        // Capability: sync type
         initializeResult.getCapabilities().setTextDocumentSync(TextDocumentSyncKind.Full);
+
+        // Capability: code completion
         CompletionOptions completionOptions = new CompletionOptions();
         initializeResult.getCapabilities().setCompletionProvider(completionOptions);
+
+        // Capability: Semantic tokens
+        // Reference: https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide
+        // Reference: https://github.com/eclipse/lsp4j/pull/446
+        // Reference: https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_semanticTokens
+        SemanticTokensWithRegistrationOptions semanticOptions =
+                new SemanticTokensWithRegistrationOptions(textDocumentService.getSemanticTokensLegend());
+        semanticOptions.setFull(true);
+        List<DocumentFilter> documentFilterList = new ArrayList<>();
+        DocumentFilter tsonDocumentFilter = new DocumentFilter();
+        tsonDocumentFilter.setLanguage("tson");
+        tsonDocumentFilter.setScheme("file");
+        documentFilterList.add(tsonDocumentFilter);
+        semanticOptions.setDocumentSelector(documentFilterList);
+        initializeResult.getCapabilities().setSemanticTokensProvider(semanticOptions);
 
         return CompletableFuture.completedFuture(initializeResult);
     }
