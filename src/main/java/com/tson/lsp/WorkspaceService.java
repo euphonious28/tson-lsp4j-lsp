@@ -2,9 +2,8 @@ package com.tson.lsp;
 
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
 import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
-import org.eclipse.lsp4j.services.WorkspaceService;
 
-public class TSONTestWorkspaceService implements WorkspaceService {
+public class WorkspaceService implements org.eclipse.lsp4j.services.WorkspaceService {
 
     /* ----- OVERRIDE: WorkspaceService ------------------------------ */
 

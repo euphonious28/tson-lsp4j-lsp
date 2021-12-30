@@ -5,7 +5,6 @@ import com.tson.lsp.data.TSONData;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
-import org.eclipse.lsp4j.services.TextDocumentService;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -18,18 +17,31 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-public class TSONTestTextDocumentService implements TextDocumentService {
+/**
+ * Text document service for handling LPS text document events
+ */
+public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocumentService {
 
     /* ----- VARIABLES ------------------------------ */
 
+    /**
+     * Remote language client
+     */
     private LanguageClient client;
 
-    private SemanticTokensLegend semanticTokensLegend;
+    /**
+     * Legend of semantic tokens
+     */
+    private final SemanticTokensLegend semanticTokensLegend;
 
-    private TSONData data = new TSONData();
+    /**
+     * TSON related data that is needed to provide LSP
+     */
+    private final TSONData data = new TSONData();
 
     /* ----- CONSTRUCTOR ------------------------------ */
-    public TSONTestTextDocumentService() {
+    public TextDocumentService() {
+        // Create Semantic Tokens Legend
         List<String> tokenTypeList = new ArrayList<>();
         tokenTypeList.add(SemanticTokenTypes.Function);
         semanticTokensLegend = new SemanticTokensLegend(tokenTypeList, new ArrayList<>());
@@ -37,12 +49,20 @@ public class TSONTestTextDocumentService implements TextDocumentService {
 
     /* ----- SETTER ------------------------------ */
 
+    /**
+     * Store the remote Language Client
+     *
+     * @param client Language Client this is providing service to
+     */
     public void setClient(LanguageClient client) {
         this.client = client;
     }
 
     /* ----- GETTER ------------------------------ */
 
+    /**
+     * Get the Semantic Tokens legend
+     */
     public SemanticTokensLegend getSemanticTokensLegend() {
         return semanticTokensLegend;
     }
@@ -79,7 +99,7 @@ public class TSONTestTextDocumentService implements TextDocumentService {
 
     @Override
     public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
-        client.logMessage(new MessageParams(MessageType.Log, "Retrieving semantics"));
+        client.logMessage(new MessageParams(MessageType.Log, "Retrieving full semantics"));
         return CompletableFuture.supplyAsync(() -> {
             // Open and read file
             Path documentPath = Paths.get("");
@@ -116,20 +136,6 @@ public class TSONTestTextDocumentService implements TextDocumentService {
                 }
             }
 
-            // Logging of current data
-            StringBuilder log = new StringBuilder();
-            for (int i = 0; i < result.size() / 5; i++) {
-                log.append(String.format(
-                        "[%d, %d, %d, %d, %d]\n",
-                        result.get(i * 5),
-                        result.get(i * 5 + 1),
-                        result.get(i * 5 + 2),
-                        result.get(i * 5 + 3),
-                        result.get(i * 5 + 4)
-                ));
-            }
-            client.logMessage(new MessageParams(MessageType.Info, "Returning tokens: " + log.toString()));
-
             // Transform into relative
             for (int i = (result.size() - 1) / 5; i > 0; i--) {     // Run backwards otherwise you'll update data you need
                 int updatedLine = result.get(i * 5) - result.get((i - 1) * 5);
@@ -138,20 +144,7 @@ public class TSONTestTextDocumentService implements TextDocumentService {
                 result.set(i * 5 + 1, updatedStartChar);
             }
 
-            // Logging of current data
-            log = new StringBuilder();
-            for (int i = 0; i < result.size() / 5; i++) {
-                log.append(String.format(
-                        "[%d, %d, %d, %d, %d]\n",
-                        result.get(i * 5),
-                        result.get(i * 5 + 1),
-                        result.get(i * 5 + 2),
-                        result.get(i * 5 + 3),
-                        result.get(i * 5 + 4)
-                ));
-            }
-            client.logMessage(new MessageParams(MessageType.Info, "Returning tokens: " + log.toString()));
-
+            client.logMessage(new MessageParams(MessageType.Log, "Returning full semantics"));
             return new SemanticTokens(result);
         });
     }
@@ -159,20 +152,6 @@ public class TSONTestTextDocumentService implements TextDocumentService {
     @Override
     public void didOpen(DidOpenTextDocumentParams params) {
         client.logMessage(new MessageParams(MessageType.Log, "Open detected"));
-//
-//        Parser parser = new Parser();
-//        client.logMessage(new MessageParams(MessageType.Log, "Parser created"));
-//        List<Statement> statementList = parser.parse(params.getTextDocument().getText());
-//
-//        client.logMessage(new MessageParams(MessageType.Log, "Statement count: " + statementList.size()));
-//        for (Statement statement : statementList) {
-//            client.logMessage(new MessageParams(MessageType.Log,
-//                    "["
-//                            + statement.getKeyword()
-//                            + "] "
-//                            + statement.getValue()
-//            ));
-//        }
     }
 
     @Override
