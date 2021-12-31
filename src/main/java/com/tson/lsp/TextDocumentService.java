@@ -30,12 +30,12 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
     /**
      * Remote language client
      */
-    private LanguageClient client;
+    LanguageClient client;
 
     /**
      * Legend of semantic tokens
      */
-    private final SemanticTokensLegend semanticTokensLegend;
+    final SemanticTokensLegend semanticTokensLegend;
 
     /**
      * TSON related data that is needed to provide LSP
@@ -47,6 +47,11 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
      */
     // TODO: Change to a better object with version tracking
     Map<String, String> fileContentMap = new HashMap<>();
+
+    /**
+     * List of completion items, generated in first call to {@link #completion(CompletionParams)} and stored for subsequent calls
+     */
+    List<CompletionItem> completionItemList;
 
     /* ----- CONSTRUCTOR ------------------------------ */
     public TextDocumentService() {
@@ -81,13 +86,12 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
     @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams position) {
 
-        // TODO: Implement a proper autocomplete using the (CompletionParams)position
         client.logMessage(new MessageParams(MessageType.Log, "Calculating completion"));
-        return CompletableFuture.supplyAsync(() -> {
-            // List of completion items to return
-            List<CompletionItem> completionItemList = new ArrayList<>();
+        // TODO: Implement a proper autocomplete using the (CompletionParams)position
 
-            String keywordList = "";
+        if (completionItemList == null) {
+            // Generate completion item list and store it
+            completionItemList = new ArrayList<>();
             for (Keyword keyword : data.getKeywordList()) {
                 CompletionItem completionItem = new CompletionItem();
                 completionItem.setInsertText(keyword.getCode());
@@ -97,13 +101,10 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
                 completionItem.setDocumentation(keyword.getLspDescriptionLong());
                 completionItem.setKind(CompletionItemKind.Function);
                 completionItemList.add(completionItem);
-                keywordList = keywordList + "|" + keyword.getCode();
             }
-            client.logMessage(new MessageParams(MessageType.Log, keywordList));
+        }
 
-            client.logMessage(new MessageParams(MessageType.Log, "Returning list"));
-            return Either.forLeft(completionItemList);
-        });
+        return CompletableFuture.completedFuture(Either.forLeft(completionItemList));
     }
 
     @Override
