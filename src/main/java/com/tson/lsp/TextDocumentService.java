@@ -3,6 +3,7 @@ package com.tson.lsp;
 import com.euph28.tson.core.keyword.Keyword;
 import com.tson.lsp.data.TSONData;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
 
@@ -14,7 +15,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -37,7 +40,13 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
     /**
      * TSON related data that is needed to provide LSP
      */
-    private final TSONData data = new TSONData();
+    final TSONData data = new TSONData();
+
+    /**
+     * Map of file-uri to file-content
+     */
+    // TODO: Change to a better object with version tracking
+    Map<String, String> fileContentMap = new HashMap<>();
 
     /* ----- CONSTRUCTOR ------------------------------ */
     public TextDocumentService() {
@@ -100,23 +109,30 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
     @Override
     public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
         client.logMessage(new MessageParams(MessageType.Log, "Retrieving full semantics"));
-        return CompletableFuture.supplyAsync(() -> {
-            // Open and read file
-            Path documentPath = Paths.get("");
-            try {
-                documentPath = Paths.get(new URL(params.getTextDocument().getUri()).toURI());
-            } catch (URISyntaxException | MalformedURLException e) {
-                client.logMessage(new MessageParams(MessageType.Error, "Invalid document: " + params.getTextDocument().getUri()));
+        return CompletableFutures.computeAsync(cancelChecker -> {
+            List<Integer> result = new ArrayList<>();
+            String fileContent = fileContentMap.get(params.getTextDocument().getUri());
+
+            // Manually open file if content doesn't exist
+            if (fileContent == null) {
+                try {
+                    Path documentPath = Paths.get(new URL(params.getTextDocument().getUri()).toURI());
+                    fileContent = Files.readString(documentPath);
+                } catch (URISyntaxException | MalformedURLException e) {
+                    client.logMessage(new MessageParams(MessageType.Error, "Invalid document path: " + params.getTextDocument().getUri()));
+                    return new SemanticTokens(result);
+                } catch (IOException e) {
+                    client.logMessage(new MessageParams(MessageType.Error, "Failed to read document: " + params.getTextDocument().getUri()));
+                    return new SemanticTokens(result);
+                }
             }
-            List<String> document = new ArrayList<>();
-            try {
-                document = Files.readAllLines(documentPath);
-            } catch (IOException e) {
-                client.logMessage(new MessageParams(MessageType.Error, "Failed to read document: " + params.getTextDocument().getUri()));
-            }
+            cancelChecker.checkCanceled();
+
+            // Convert from String to List<String>
+            List<String> document = List.of(fileContent.split("\r\n|\n|\r"));
+            cancelChecker.checkCanceled();
 
             // Parse document for semantics
-            List<Integer> result = new ArrayList<>();
             for (int lineIndex = 0; lineIndex < document.size(); lineIndex++) {
                 // For each line:
                 String line = document.get(lineIndex);
@@ -151,12 +167,31 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
 
     @Override
     public void didOpen(DidOpenTextDocumentParams params) {
-        client.logMessage(new MessageParams(MessageType.Log, "Open detected"));
+        client.logMessage(new MessageParams(MessageType.Log, "Open detected, file: " + params.getTextDocument().getUri()));
+        // Retrieve existing item
+        String existingItem = fileContentMap.get(params.getTextDocument().getUri());
+
+        // Store item
+        fileContentMap.put(
+                params.getTextDocument().getUri(),
+                existingItem
+        );
     }
 
     @Override
     public void didChange(DidChangeTextDocumentParams params) {
-        client.logMessage(new MessageParams(MessageType.Log, "Change detected"));
+        client.logMessage(new MessageParams(MessageType.Log, "Change detected, file: " + params.getTextDocument().getUri()));
+        // Report error if it isn't tracked
+        if (!fileContentMap.containsKey(params.getTextDocument().getUri())) {
+            client.logMessage(new MessageParams(MessageType.Error, "Change detected but file wasn't tracked. File: " + params.getTextDocument().getUri()));
+            return;
+        }
+
+        // Otherwise, update existing item if version is correct
+        params.getContentChanges().forEach(changeEvent -> fileContentMap.put(
+                params.getTextDocument().getUri(),
+                changeEvent.getText()
+        ));
     }
 
     @Override
