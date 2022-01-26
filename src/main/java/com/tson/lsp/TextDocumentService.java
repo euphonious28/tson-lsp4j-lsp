@@ -2,6 +2,7 @@ package com.tson.lsp;
 
 import com.euph28.tson.core.keyword.Keyword;
 import com.tson.lsp.data.TSONData;
+import com.tson.lsp.utility.SemanticTokenEntry;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -19,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  * Text document service for handling LPS text document events
@@ -111,7 +113,7 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
     public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
         client.logMessage(new MessageParams(MessageType.Log, "Retrieving full semantics"));
         return CompletableFutures.computeAsync(cancelChecker -> {
-            List<Integer> result = new ArrayList<>();
+            List<SemanticTokenEntry> result = new ArrayList<>();
             String fileContent = fileContentMap.get(params.getTextDocument().getUri());
 
             // Manually open file if content doesn't exist
@@ -121,10 +123,10 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
                     fileContent = Files.readString(documentPath);
                 } catch (URISyntaxException | MalformedURLException e) {
                     client.logMessage(new MessageParams(MessageType.Error, "Invalid document path: " + params.getTextDocument().getUri()));
-                    return new SemanticTokens(result);
+                    return new SemanticTokens(new ArrayList<>());
                 } catch (IOException e) {
                     client.logMessage(new MessageParams(MessageType.Error, "Failed to read document: " + params.getTextDocument().getUri()));
-                    return new SemanticTokens(result);
+                    return new SemanticTokens(new ArrayList<>());
                 }
             }
             cancelChecker.checkCanceled();
@@ -141,28 +143,34 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
                 // Check if it contains a keyword
                 for (Keyword keyword : data.getKeywordList()) {
                     // If it contains, get the index of it
+                    int indexKeyword = line.indexOf(keyword.getCode());
                     // TODO: Detect multiple keywords per line
-                    if (line.contains(keyword.getCode())) {
-                        // Insert result based on specification: https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_semanticTokens
-                        result.add(lineIndex);                          // Line
-                        result.add(line.indexOf(keyword.getCode()));    // StartChar
-                        result.add(keyword.getCode().length());         // Length
-                        result.add(0);                                  // TokenType | TODO: Handle different types
-                        result.add(0);                                  // TokenModifier | TODO: Handle modifiers
+                    if (indexKeyword != -1) {
+                        result.add(new SemanticTokenEntry(
+                                lineIndex,
+                                indexKeyword,
+                                keyword.getCode().length(),
+                                SemanticTokenTypes.Function,
+                                ""
+                        ));
                     }
                 }
             }
 
             // Transform into relative
-            for (int i = (result.size() - 1) / 5; i > 0; i--) {     // Run backwards otherwise you'll update data you need
-                int updatedLine = result.get(i * 5) - result.get((i - 1) * 5);
-                int updatedStartChar = updatedLine == 0 ? result.get(i * 5 + 1) - result.get((i - 1) * 5 + 1) : result.get(i * 5 + 1);
-                result.set(i * 5, updatedLine);
-                result.set(i * 5 + 1, updatedStartChar);
+            for (int i = result.size() - 1; i > 0; i--) {     // Run backwards otherwise you'll update data you need
+                result.get(i).relativize(result.get(i - 1));
             }
 
+            // Return result
             client.logMessage(new MessageParams(MessageType.Log, "Returning full semantics"));
-            return new SemanticTokens(result);
+            return new SemanticTokens(
+                    // Transform into array
+                    result.stream()
+                            .map(entry->entry.getAsIntList(semanticTokensLegend.getTokenTypes(), semanticTokensLegend.getTokenModifiers()))
+                            .flatMap(List::stream)
+                            .collect(Collectors.toList())
+            );
         });
     }
 
