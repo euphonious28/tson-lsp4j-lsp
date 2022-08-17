@@ -3,6 +3,7 @@ package com.tson.lsp;
 import com.euph28.tson.core.keyword.Keyword;
 import com.tson.lsp.data.TSONData;
 import com.tson.lsp.utility.SemanticTokenEntry;
+import com.tson.lsp.utility.SemanticTokenRetriever;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -60,6 +61,8 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
         // Create Semantic Tokens Legend
         List<String> tokenTypeList = new ArrayList<>();
         tokenTypeList.add(SemanticTokenTypes.Function);
+        tokenTypeList.add(SemanticTokenTypes.Comment);
+        tokenTypeList.add(SemanticTokenTypes.Parameter);
         semanticTokensLegend = new SemanticTokensLegend(tokenTypeList, new ArrayList<>());
     }
 
@@ -113,6 +116,7 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
     public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
         client.logMessage(new MessageParams(MessageType.Log, "Retrieving full semantics"));
         return CompletableFutures.computeAsync(cancelChecker -> {
+            // Result list and content for parsing
             List<SemanticTokenEntry> result = new ArrayList<>();
             String fileContent = fileContentMap.get(params.getTextDocument().getUri());
 
@@ -131,33 +135,38 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
             }
             cancelChecker.checkCanceled();
 
-            // Convert from String to List<String>
-            List<String> document = List.of(fileContent.split("\r\n|\n|\r"));
-            cancelChecker.checkCanceled();
+//            // Convert from String to List<String>
+//            List<String> document = List.of(fileContent.split("\r\n|\n|\r"));
+//            cancelChecker.checkCanceled();
 
-            // Parse document for semantics
-            for (int lineIndex = 0; lineIndex < document.size(); lineIndex++) {
-                // For each line:
-                String line = document.get(lineIndex);
+//            // Parse document for semantics
+//            for (int lineIndex = 0; lineIndex < document.size(); lineIndex++) {
+//                // For each line:
+//                String line = document.get(lineIndex);
+//
+//                // Check if it contains a keyword
+//                for (Keyword keyword : data.getKeywordList()) {
+//                    // If it contains, get the index of it
+//                    int indexKeyword = line.indexOf(keyword.getCode());
+//                    // TODO: Detect multiple keywords per line
+//                    if (indexKeyword != -1) {
+//                        result.add(new SemanticTokenEntry(
+//                                lineIndex,
+//                                indexKeyword,
+//                                keyword.getCode().length(),
+//                                SemanticTokenTypes.Function,
+//                                ""
+//                        ));
+//                    }
+//                }
+//            }
 
-                // Check if it contains a keyword
-                for (Keyword keyword : data.getKeywordList()) {
-                    // If it contains, get the index of it
-                    int indexKeyword = line.indexOf(keyword.getCode());
-                    // TODO: Detect multiple keywords per line
-                    if (indexKeyword != -1) {
-                        result.add(new SemanticTokenEntry(
-                                lineIndex,
-                                indexKeyword,
-                                keyword.getCode().length(),
-                                SemanticTokenTypes.Function,
-                                ""
-                        ));
-                    }
-                }
-            }
+            // Retrieve list of semantic tokens
+            SemanticTokenRetriever semanticTokenRetriever = new SemanticTokenRetriever();
+            result = semanticTokenRetriever.getSemanticTokens(fileContent, data, cancelChecker);
 
             // Transform into relative
+            // TODO: Handle multiline highlighting
             for (int i = result.size() - 1; i > 0; i--) {     // Run backwards otherwise you'll update data you need
                 result.get(i).relativize(result.get(i - 1));
             }
