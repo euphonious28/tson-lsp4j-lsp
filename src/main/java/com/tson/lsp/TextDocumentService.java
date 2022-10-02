@@ -2,8 +2,9 @@ package com.tson.lsp;
 
 import com.euph28.tson.core.keyword.Keyword;
 import com.tson.lsp.data.TSONData;
-import com.tson.lsp.utility.SemanticTokenEntry;
-import com.tson.lsp.utility.SemanticTokenRetriever;
+import com.tson.lsp.utility.semantictoken.ParserException;
+import com.tson.lsp.utility.semantictoken.SemanticTokenEntry;
+import com.tson.lsp.utility.semantictoken.SemanticTokenRetriever;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -118,7 +119,7 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
             long startTime = System.nanoTime();
 
             // Result list and content for parsing
-            List<SemanticTokenEntry> result;
+            List<SemanticTokenEntry> result = new ArrayList<>();
             String fileContent = fileContentMap.get(params.getTextDocument().getUri());
 
             // Manually open file if content doesn't exist
@@ -138,7 +139,18 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
 
             // Retrieve list of semantic tokens
             SemanticTokenRetriever semanticTokenRetriever = new SemanticTokenRetriever();
-            result = semanticTokenRetriever.getSemanticTokens(fileContent, data, cancelChecker);
+            try {
+                result = semanticTokenRetriever.getSemanticTokens(fileContent, data, cancelChecker);
+
+                // Clear diagnostics
+                client.publishDiagnostics(new PublishDiagnosticsParams(params.getTextDocument().getUri(), new ArrayList<>()));
+            } catch (ParserException e) {
+                // Publish
+                client.publishDiagnostics(new PublishDiagnosticsParams(
+                        params.getTextDocument().getUri(),
+                        e.getDiagnosticList()
+                ));
+            }
 
             // Transform into relative
             for (int i = result.size() - 1; i > 0; i--) {     // Run backwards otherwise you'll update data you need
@@ -155,7 +167,7 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
             return new SemanticTokens(
                     // Transform into array
                     result.stream()
-                            .map(entry->entry.getAsIntList(semanticTokensLegend.getTokenTypes(), semanticTokensLegend.getTokenModifiers()))
+                            .map(entry -> entry.getAsIntList(semanticTokensLegend.getTokenTypes(), semanticTokensLegend.getTokenModifiers()))
                             .flatMap(List::stream)
                             .collect(Collectors.toList())
             );

@@ -1,4 +1,4 @@
-package com.tson.lsp.utility;
+package com.tson.lsp.utility.semantictoken;
 
 import com.euph28.tson.antlr.TsonParser;
 import com.euph28.tson.antlr.TsonParserBaseListener;
@@ -7,6 +7,7 @@ import com.euph28.tson.interpreter.TSONInterpreter;
 import com.tson.lsp.data.TSONData;
 import com.tson.lsp.utility.tson.DirectContentProvider;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
@@ -14,19 +15,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class SemanticTokenRetriever {
-    public List<SemanticTokenEntry> getSemanticTokens(String content, TSONData tsonData, CancelChecker cancelChecker) {
+
+    public List<SemanticTokenEntry> getSemanticTokens(String content, TSONData tsonData, CancelChecker cancelChecker) throws ParserException {
         // Result object
         List<SemanticTokenEntry> result = new ArrayList<>();
 
         // Use TSON Interpreter to parse the content
         TSONInterpreter interpreter = tsonData.getTsonInterpreter();
+        ParserErrorListener errorListener = new ParserErrorListener();
         interpreter.addContentProvider(new DirectContentProvider());
-        Interpretation interpretation = interpreter.interpret(content);
+        Interpretation interpretation = interpreter.interpret(content, errorListener);
 
         // Check that interpretation is loaded
         if (interpretation == null || interpretation.hasError()) {
-            // TODO: Log error that parsing failed
-            return result;
+            List<Diagnostic> diagnosticList = errorListener.getDiagnosticList();
+            throw new ParserException(diagnosticList);
         }
 
         // Check for cancel
