@@ -125,6 +125,7 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
             // Manually open file if content doesn't exist
             if (fileContent == null) {
                 try {
+                    client.logMessage(new MessageParams(MessageType.Info, "Document was not cached: " + params.getTextDocument().getUri()));
                     Path documentPath = Paths.get(new URL(params.getTextDocument().getUri()).toURI());
                     fileContent = Files.readString(documentPath);
                 } catch (URISyntaxException | MalformedURLException e) {
@@ -176,14 +177,10 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
 
     @Override
     public void didOpen(DidOpenTextDocumentParams params) {
-        client.logMessage(new MessageParams(MessageType.Log, "Open detected, file: " + params.getTextDocument().getUri()));
-        // Retrieve existing item
-        String existingItem = fileContentMap.get(params.getTextDocument().getUri());
-
         // Store item
         fileContentMap.put(
                 params.getTextDocument().getUri(),
-                existingItem
+                params.getTextDocument().getText()
         );
     }
 

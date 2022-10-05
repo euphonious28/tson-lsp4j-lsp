@@ -1,49 +1,42 @@
 package com.tson.lsp.utility.semantictoken;
 
+import com.euph28.tson.antlr.TsonLexer;
 import com.euph28.tson.antlr.TsonParser;
 import com.euph28.tson.antlr.TsonParserBaseListener;
 import com.euph28.tson.interpreter.Interpretation;
 import com.euph28.tson.interpreter.TSONInterpreter;
 import com.tson.lsp.data.TSONData;
-import com.tson.lsp.utility.tson.DirectContentProvider;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.eclipse.lsp4j.Diagnostic;
 import org.eclipse.lsp4j.SemanticTokenTypes;
 import org.eclipse.lsp4j.jsonrpc.CancelChecker;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class SemanticTokenRetriever {
 
     public List<SemanticTokenEntry> getSemanticTokens(String content, TSONData tsonData, CancelChecker cancelChecker) throws ParserException {
+        /* ============================== INITIALIZATION ============================== */
         // Result object
         List<SemanticTokenEntry> result = new ArrayList<>();
 
         // Use TSON Interpreter to parse the content
         TSONInterpreter interpreter = tsonData.getTsonInterpreter();
-        ParserErrorListener errorListener = new ParserErrorListener();
-        interpreter.addContentProvider(new DirectContentProvider());
-        Interpretation interpretation = interpreter.interpret(content, errorListener);
+        Interpretation interpretation = interpreter.interpret(content);
 
-        // Check that interpretation is loaded
-        if (interpretation == null || interpretation.hasError()) {
-            List<Diagnostic> diagnosticList = errorListener.getDiagnosticList();
-            throw new ParserException(diagnosticList);
-        }
+        // Error listener for syntax error
+        ParserErrorListener errorListener = new ParserErrorListener();
 
         // Check for cancel
         if (cancelChecker.isCanceled()) {
             return result;
         }
 
-        // Retrieve keywords
-        interpretation.walkListener(new TsonParserBaseListener() {
-            @Override
-            public void enterComment(TsonParser.CommentContext ctx) {
-                result.addAll(getEntries(ctx, SemanticTokenTypes.Comment, "", true));
-            }
-
+        /* ============================== MAIN CHANNEL AND SYNTAX CHECK ============================== */
+        // Retrieve from channel 0
+        interpretation.parse(TsonLexer.DEFAULT_TOKEN_CHANNEL, new TsonParserBaseListener() {
             @Override
             public void enterProperties(TsonParser.PropertiesContext ctx) {
                 result.addAll(getEntries(ctx, SemanticTokenTypes.Parameter, "", true));
@@ -53,8 +46,30 @@ public class SemanticTokenRetriever {
             public void enterKeyword(TsonParser.KeywordContext ctx) {
                 result.addAll(getEntries(ctx, SemanticTokenTypes.Function, "", false));
             }
-        });
+        }, errorListener);
 
+        // Check for cancel
+        if (cancelChecker.isCanceled()) {
+            return result;
+        }
+
+        // Check validity of interpretation
+        if (!errorListener.diagnosticList.isEmpty()) {
+            List<Diagnostic> diagnosticList = errorListener.getDiagnosticList();
+            throw new ParserException(diagnosticList);
+        }
+
+        /* ============================== OTHER CHANNELS ============================== */
+        // Retrieve from comments channel
+        interpretation.parse(TsonLexer.COMMENTS, new TsonParserBaseListener() {
+            @Override
+            public void enterComment(TsonParser.CommentContext ctx) {
+                result.addAll(getEntries(ctx, SemanticTokenTypes.Comment, "", true));
+            }
+        }, errorListener);
+
+        /* ============================== SORT AND RETURN ============================== */
+        Collections.sort(result);
         return result;
     }
 

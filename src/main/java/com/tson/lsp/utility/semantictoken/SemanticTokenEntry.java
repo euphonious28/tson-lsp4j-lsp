@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Individual entry for a semantic token highlighting
  */
-public class SemanticTokenEntry {
+public class SemanticTokenEntry implements Comparable<SemanticTokenEntry> {
     /* ----- VARIABLES ------------------------------ */
     int lineIndex, startChar, tokenLength;
     String tokenType, tokenModifier;
@@ -41,18 +41,6 @@ public class SemanticTokenEntry {
         return startChar;
     }
 
-    public int getTokenLength() {
-        return tokenLength;
-    }
-
-    public String getTokenType() {
-        return tokenType;
-    }
-
-    public String getTokenModifier() {
-        return tokenModifier;
-    }
-
     /**
      * Retrieve entry in the form of int list as per specification: https://microsoft.github.io/language-server-protocol/specifications/specification-current/#textDocument_semanticTokens
      *
@@ -67,4 +55,19 @@ public class SemanticTokenEntry {
         integerList.add(0);
         return integerList;
     }
+
+    /* ----- OVERRIDE: COMPARATOR ------------------------------ */
+
+    @Override
+    public int compareTo(SemanticTokenEntry o) {
+        if(this.getLineIndex() != o.getLineIndex()) {
+            return this.getLineIndex() > o.getLineIndex() ? 1 : -1;
+        }
+        else if (this.getStartChar() != o.getStartChar()) {
+            return this.getStartChar() > o.getStartChar() ? 1 : -1;
+        } else {
+            return 0;
+        }
+    }
+
 }

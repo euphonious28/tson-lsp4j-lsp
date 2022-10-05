@@ -1,6 +1,6 @@
 package com.tson.lsp.utility.semantictoken;
 
-import com.euph28.tson.interpreter.ErrorListener;
+import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
 import org.eclipse.lsp4j.Diagnostic;
@@ -10,7 +10,7 @@ import org.eclipse.lsp4j.Range;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ParserErrorListener extends ErrorListener {
+public class ParserErrorListener extends BaseErrorListener {
     List<Diagnostic> diagnosticList = new ArrayList<>();
 
     @Override
