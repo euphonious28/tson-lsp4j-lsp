@@ -33,7 +33,6 @@ public class LanguageServer implements org.eclipse.lsp4j.services.LanguageServer
 
     @Override
     public CompletableFuture<InitializeResult> initialize(InitializeParams params) {
-
         // Log initialization
         languageClient.logMessage(new MessageParams(MessageType.Log, "Initializing server"));
 

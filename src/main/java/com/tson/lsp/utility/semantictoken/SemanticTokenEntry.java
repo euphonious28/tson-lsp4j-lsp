@@ -1,4 +1,4 @@
-package com.tson.lsp.utility;
+package com.tson.lsp.utility.semantictoken;
 
 import java.util.ArrayList;
 import java.util.List;

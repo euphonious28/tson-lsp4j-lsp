@@ -2,7 +2,9 @@ package com.tson.lsp;
 
 import com.euph28.tson.core.keyword.Keyword;
 import com.tson.lsp.data.TSONData;
-import com.tson.lsp.utility.SemanticTokenEntry;
+import com.tson.lsp.utility.semantictoken.ParserException;
+import com.tson.lsp.utility.semantictoken.SemanticTokenEntry;
+import com.tson.lsp.utility.semantictoken.SemanticTokenRetriever;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.CompletableFutures;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
@@ -20,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -60,6 +63,8 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
         // Create Semantic Tokens Legend
         List<String> tokenTypeList = new ArrayList<>();
         tokenTypeList.add(SemanticTokenTypes.Function);
+        tokenTypeList.add(SemanticTokenTypes.Comment);
+        tokenTypeList.add(SemanticTokenTypes.Parameter);
         semanticTokensLegend = new SemanticTokensLegend(tokenTypeList, new ArrayList<>());
     }
 
@@ -87,8 +92,6 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
 
     @Override
     public CompletableFuture<Either<List<CompletionItem>, CompletionList>> completion(CompletionParams position) {
-
-        client.logMessage(new MessageParams(MessageType.Log, "Calculating completion"));
         // TODO: Implement a proper autocomplete using the (CompletionParams)position
 
         if (completionItemList == null) {
@@ -111,8 +114,11 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
 
     @Override
     public CompletableFuture<SemanticTokens> semanticTokensFull(SemanticTokensParams params) {
-        client.logMessage(new MessageParams(MessageType.Log, "Retrieving full semantics"));
         return CompletableFutures.computeAsync(cancelChecker -> {
+            // Performance tracking
+            long startTime = System.nanoTime();
+
+            // Result list and content for parsing
             List<SemanticTokenEntry> result = new ArrayList<>();
             String fileContent = fileContentMap.get(params.getTextDocument().getUri());
 
@@ -131,30 +137,19 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
             }
             cancelChecker.checkCanceled();
 
-            // Convert from String to List<String>
-            List<String> document = List.of(fileContent.split("\r\n|\n|\r"));
-            cancelChecker.checkCanceled();
+            // Retrieve list of semantic tokens
+            SemanticTokenRetriever semanticTokenRetriever = new SemanticTokenRetriever();
+            try {
+                result = semanticTokenRetriever.getSemanticTokens(fileContent, data, cancelChecker);
 
-            // Parse document for semantics
-            for (int lineIndex = 0; lineIndex < document.size(); lineIndex++) {
-                // For each line:
-                String line = document.get(lineIndex);
-
-                // Check if it contains a keyword
-                for (Keyword keyword : data.getKeywordList()) {
-                    // If it contains, get the index of it
-                    int indexKeyword = line.indexOf(keyword.getCode());
-                    // TODO: Detect multiple keywords per line
-                    if (indexKeyword != -1) {
-                        result.add(new SemanticTokenEntry(
-                                lineIndex,
-                                indexKeyword,
-                                keyword.getCode().length(),
-                                SemanticTokenTypes.Function,
-                                ""
-                        ));
-                    }
-                }
+                // Clear diagnostics
+                client.publishDiagnostics(new PublishDiagnosticsParams(params.getTextDocument().getUri(), new ArrayList<>()));
+            } catch (ParserException e) {
+                // Publish
+                client.publishDiagnostics(new PublishDiagnosticsParams(
+                        params.getTextDocument().getUri(),
+                        e.getDiagnosticList()
+                ));
             }
 
             // Transform into relative
@@ -162,12 +157,17 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
                 result.get(i).relativize(result.get(i - 1));
             }
 
+            // Performance tracking
+            client.logMessage(new MessageParams(
+                    MessageType.Log,
+                    "Retrieved semantics in " + TimeUnit.MILLISECONDS.convert(System.nanoTime() - startTime, TimeUnit.NANOSECONDS) + " ms")
+            );
+
             // Return result
-            client.logMessage(new MessageParams(MessageType.Log, "Returning full semantics"));
             return new SemanticTokens(
                     // Transform into array
                     result.stream()
-                            .map(entry->entry.getAsIntList(semanticTokensLegend.getTokenTypes(), semanticTokensLegend.getTokenModifiers()))
+                            .map(entry -> entry.getAsIntList(semanticTokensLegend.getTokenTypes(), semanticTokensLegend.getTokenModifiers()))
                             .flatMap(List::stream)
                             .collect(Collectors.toList())
             );
@@ -189,7 +189,6 @@ public class TextDocumentService implements org.eclipse.lsp4j.services.TextDocum
 
     @Override
     public void didChange(DidChangeTextDocumentParams params) {
-        client.logMessage(new MessageParams(MessageType.Log, "Change detected, file: " + params.getTextDocument().getUri()));
         // Report error if it isn't tracked
         if (!fileContentMap.containsKey(params.getTextDocument().getUri())) {
             client.logMessage(new MessageParams(MessageType.Error, "Change detected but file wasn't tracked. File: " + params.getTextDocument().getUri()));
